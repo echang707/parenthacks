@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import Home from './pages/Home'
 import CategoryPage from './pages/CategoryPage'
 import QuestionPage from './pages/QuestionPage'
+import HackDetailPage from './pages/HackDetailPage'
 import SubmitHackPage from './pages/SubmitHackPage'
 import AuthPage from './pages/AuthPage'
 import ProfilePage from './pages/ProfilePage'
@@ -16,6 +17,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/category/:category" element={<CategoryPage />} />
           <Route path="/question/:id" element={<QuestionPage />} />
+          <Route path="/hack/:id" element={<HackDetailPage />} />
           <Route path="/submit" element={<SubmitHackPage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/profile" element={<ProfilePage />} />

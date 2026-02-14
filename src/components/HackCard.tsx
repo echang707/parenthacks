@@ -13,200 +13,153 @@ export default function HackCard({ hack, onUpdate }: Props) {
   const { user } = useAuth()
   const [upvotes, setUpvotes] = useState(hack.upvotes || 0)
   const [hasVoted, setHasVoted] = useState(hack.user_has_voted || false)
-  const [hasSaved, setHasSaved] = useState(hack.user_has_saved || false)
-  const [isVoting, setIsVoting] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
 
-  async function handleUpvote() {
-    // No login required for upvoting
-    setIsVoting(true)
+  async function handleUpvote(e: React.MouseEvent) {
+    e.preventDefault() // Don't trigger the card link
+    e.stopPropagation()
 
-    try {
-      if (user) {
-        // Logged in user - track their vote
-        if (hasVoted) {
-          await supabase
+    if (user && hasVoted) {
+      const previousUpvotes = upvotes
+      
+      try {
+        setUpvotes(upvotes - 1)
+        setHasVoted(false)
+
+        await Promise.all([
+          supabase
             .from('hack_votes')
             .delete()
             .eq('hack_id', hack.id)
-            .eq('user_id', user.id)
-
-          await supabase
+            .eq('user_id', user.id),
+          supabase
             .from('hacks')
             .update({ upvotes: upvotes - 1 })
             .eq('id', hack.id)
-
-          setUpvotes(upvotes - 1)
-          setHasVoted(false)
-        } else {
-          await supabase
-            .from('hack_votes')
-            .insert({ hack_id: hack.id, user_id: user.id })
-
-          await supabase
-            .from('hacks')
-            .update({ upvotes: upvotes + 1 })
-            .eq('id', hack.id)
-
-          setUpvotes(upvotes + 1)
-          setHasVoted(true)
-        }
-      } else {
-        // Not logged in - just increment upvote count
-        await supabase
-          .from('hacks')
-          .update({ upvotes: upvotes + 1 })
-          .eq('id', hack.id)
-
-        setUpvotes(upvotes + 1)
+        ])
+      } catch (error) {
+        console.error('Error removing vote:', error)
+        setUpvotes(previousUpvotes)
+        setHasVoted(true)
       }
-      
-      onUpdate?.()
-    } catch (error) {
-      console.error('Error voting:', error)
-      alert('Error voting. Please try again.')
-    } finally {
-      setIsVoting(false)
-    }
-  }
-
-  async function handleSave() {
-    if (!user) {
-      alert('Please sign in to save hacks')
       return
     }
 
-    setIsSaving(true)
+    if (user && !hasVoted) {
+      const previousUpvotes = upvotes
+      
+      try {
+        setUpvotes(upvotes + 1)
+        setHasVoted(true)
 
-    try {
-      if (hasSaved) {
-        await supabase
-          .from('saved_hacks')
-          .delete()
-          .eq('hack_id', hack.id)
-          .eq('user_id', user.id)
-
-        setHasSaved(false)
-      } else {
-        await supabase
-          .from('saved_hacks')
-          .insert({ hack_id: hack.id, user_id: user.id })
-
-        setHasSaved(true)
+        await Promise.all([
+          supabase
+            .from('hack_votes')
+            .insert({ hack_id: hack.id, user_id: user.id }),
+          supabase
+            .from('hacks')
+            .update({ upvotes: upvotes + 1 })
+            .eq('id', hack.id)
+        ])
+      } catch (error) {
+        console.error('Error adding vote:', error)
+        setUpvotes(previousUpvotes)
+        setHasVoted(false)
       }
-    } catch (error) {
-      console.error('Error saving:', error)
-      alert('Error saving. Please try again.')
-    } finally {
-      setIsSaving(false)
+      return
+    }
+
+    if (!user) {
+      alert('Sign in to upvote hacks!')
+      return
     }
   }
 
   return (
-    <div className="bg-card rounded-2xl border-2 border-accent hover:border-primary transition-all duration-200 shadow-sm hover:shadow-md">
+    <Link 
+      to={`/hack/${hack.id}`}
+      className="block bg-card rounded-2xl border-2 border-accent hover:border-primary transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 group"
+    >
       <div className="p-6">
         <div className="flex gap-4">
           {/* Upvote Section */}
           <div className="flex flex-col items-center gap-1 flex-shrink-0">
             <button
               onClick={handleUpvote}
-              disabled={isVoting}
-              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+              className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200 ${
                 hasVoted
-                  ? 'bg-primary text-white'
-                  : 'bg-accent hover:bg-primary/10 text-textMuted hover:text-primary'
-              } ${isVoting ? 'opacity-50' : ''}`}
+                  ? 'bg-gradient-to-br from-primary to-primary/70 text-white shadow-lg'
+                  : 'bg-accent hover:bg-primary/10 text-textMuted hover:text-primary hover:scale-110'
+              } hover:shadow-md active:scale-95`}
+              title={hasVoted ? 'Remove upvote' : 'Upvote this hack'}
             >
-              <svg className="w-5 h-5" fill={hasVoted ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              <svg 
+                className={`w-6 h-6 transition-transform ${hasVoted ? 'scale-110' : ''}`} 
+                fill={hasVoted ? 'currentColor' : 'none'} 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span className={`text-sm font-semibold ${hasVoted ? 'text-primary' : 'text-textMuted'}`}>
+            <span className={`text-base font-bold transition-colors ${hasVoted ? 'text-primary' : 'text-textMuted'}`}>
               {upvotes}
             </span>
           </div>
 
-          {/* Content */}
+          {/* Content - Simplified */}
           <div className="flex-1 min-w-0">
-            {/* Question - Make it BIGGER and more prominent */}
+            {/* Question */}
             {hack.question && (
-              <Link
-                to={`/question/${hack.question.id}`}
-                className="block mb-3 group"
-              >
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20 transition-colors mb-2">
+              <div className="mb-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-primary/10 to-primary/5 text-primary rounded-lg text-xs font-medium mb-2">
                   <span>{hack.question.category}</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
                 </div>
-                <h3 className="text-xl font-bold text-textPrimary group-hover:text-primary transition-colors mb-3">
+                <h3 className="text-lg font-bold text-textPrimary group-hover:text-primary transition-colors line-clamp-2">
                   {hack.question.title}
                 </h3>
-              </Link>
+              </div>
             )}
 
-            {/* Hack Title and Content */}
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <div className="flex-1">
-                <h4 className="text-lg font-semibold text-textPrimary mb-2">
-                  💡 {hack.title}
-                </h4>
-              </div>
-
-              {/* Save Button */}
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className={`flex-shrink-0 p-2 rounded-xl transition-all ${
-                  hasSaved
-                    ? 'text-primary bg-primary/10'
-                    : 'text-textMuted hover:text-primary hover:bg-primary/10'
-                } ${isSaving ? 'opacity-50' : ''}`}
-                title={hasSaved ? 'Unsave' : 'Save'}
-              >
-                <svg className="w-5 h-5" fill={hasSaved ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                </svg>
-              </button>
+            {/* Hack Title */}
+            <div className="flex items-start gap-2 mb-3">
+              <span className="text-xl flex-shrink-0">💡</span>
+              <h4 className="text-base font-semibold text-textPrimary line-clamp-2">
+                {hack.title}
+              </h4>
             </div>
 
-            <p className="text-textPrimary leading-relaxed mb-4">
+            {/* Preview snippet */}
+            <p className="text-sm text-textMuted line-clamp-2 mb-3">
               {hack.description}
             </p>
 
-            {hack.why_it_works && (
-              <div className="bg-accent/50 rounded-xl p-4 border border-accent mb-4">
-                <p className="text-sm text-textMuted">
-                  <span className="font-semibold text-primary">Why it works: </span>
-                  {hack.why_it_works}
-                </p>
-              </div>
-            )}
-
-            {/* Metadata */}
-            {(hack.age_range || hack.time_cost || hack.money_cost) && (
-              <div className="flex flex-wrap gap-2">
-                {hack.age_range && (
-                  <span className="px-3 py-1 bg-accent/50 rounded-full text-xs text-textMuted">
-                    👶 {hack.age_range}
-                  </span>
-                )}
-                {hack.time_cost && (
-                  <span className="px-3 py-1 bg-accent/50 rounded-full text-xs text-textMuted">
-                    ⏱️ {hack.time_cost}
-                  </span>
-                )}
-                {hack.money_cost && (
-                  <span className="px-3 py-1 bg-accent/50 rounded-full text-xs text-textMuted">
-                    💰 {hack.money_cost}
-                  </span>
-                )}
-              </div>
-            )}
+            {/* Metadata tags - compact */}
+            <div className="flex flex-wrap gap-2">
+              {hack.age_range && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-full text-xs text-blue-700">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
+                  </svg>
+                  {hack.age_range}
+                </span>
+              )}
+              {hack.time_cost && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 rounded-full text-xs text-purple-700">
+                  ⏱️ {hack.time_cost}
+                </span>
+              )}
+              
+              {/* View details indicator */}
+              <span className="ml-auto inline-flex items-center gap-1 text-primary text-xs font-medium group-hover:gap-2 transition-all">
+                View details
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   )
 }
